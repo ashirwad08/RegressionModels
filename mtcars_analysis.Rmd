@@ -1,0 +1,286 @@
+---
+title: "Motor Trends Dataset MPG Analysis"
+author: "Ash Chakraborty"
+date: "July 20, 2015"
+output: html_document:
+        toc: true
+        theme: cosmo
+---
+
+```{r global_options, echo=FALSE, warning=FALSE, message=FALSE, error=FALSE, fig.path="/Figures"}
+library(knitr)
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE, error=FALSE, highlight=TRUE)
+library(datasets)
+data("mtcars")
+library(car)
+library(GGally)
+library(gplots)
+```
+
+# Executive Statement
+
+- We look at mtcars data, 32 observations of 11 variables, collected for 1973-74 models
+- Specifically we want to understand and quantify the impact on MPG by automatic versus manual transmission vehicles
+- It's not straightforward, there are some confounders, so we have to pit some models against each other and eliminate them until we find the best one.
+- Once found, we'll quantify the impact on MPG by Manual and Auto transmission vehicles, and see if this difference is significant. 
+
+# Building Models
+
+Since we have the one response variable that we're trying to predict for - "MPG" - we have 10 remaining variables. All of these could be considered as potential predictors of MPG. We attempt to pursue different strategies to pick the most promising potential predictors and therefore, as a first step, build competing models.
+
+## MODEL 1 (Linear Correlation): Most Correlated Response-Predictor Pairs
+
+For the first model, we look at scatter plots of the response - MPG - against every potential predictor in Figure 1.1. We filter predictors based on the following criteria:  
+- Adjusted R^2
+- Slope coefficient that's significant. 
+- Approximate linear relationship with fitted line, few outliers accepted.
+
+We thus arrive at the model (including "am" by default), in decreasing strength of R2:
+
+mpg ~ wt + cyl + disp + hp + am
+```{r}
+model1 <- lm(mpg~wt+cyl+disp+hp+am, data=mtcars)
+```
+
+
+## MODEL 2 (STEPWISE ADDITION/ELIMINATION): Arriving at Ideal AIC Score
+
+The stepwise function will be called on the _mpg~._ model to iterate through _Forward Addition_ and _Backwards Elimination_ procedures and pick the models with the most optimal AIC value:  
+
+```{r}
+model2.step <- step(lm(mpg~., data=mtcars), direction="both", trace=FALSE)
+model2.step$coefficients
+model2 <- lm(mpg~wt+qsec+am, data=mtcars)
+```  
+
+We see that the most optimal model coming out of Stepwise Addition/Elimination is 
+
+mpg ~ wt + qsec + am.
+
+
+## MODEL 3 (Correlation and VIF Analysis)
+
+This model uses the top most significantly correlated potential predictors to the response variable, and then performs a _Multicollinearity_ analysis on these to weed out any predictors that cause alarming variance inflation. 
+
+In order to extract the initial model, I extract the top predictors most correlated with the response:
+
+
+After performing a nested VIF analysis by inserting each predictor if VIF allows it, I get the suggested equation: 
+
+
+
+## MODEL 4: Fit All
+
+This model simply fits all! 
+
+mpg ~ cyl + disp + hp + drat + wt + qsec + vs + am + gear + carb
+
+```{r}
+model3 <- lm(mpg~., data=mtcars)
+```
+
+# Refining Models
+
+## Looking for Non-Multicollinearity
+
+Is there any relationship between predictors? I'll test the Variance Inflation in each model.
+
+```{r}
+cat('Model 1 \n')
+knitr::kable(vif(model1))
+
+cat('Model 2 \n')
+knitr::kable(vif(model2))
+
+cat('Model 3 \n')
+knitr::kable(vif(model3))
+```  
+
+We see Models 1 and 3 exhibit _multicollinearity_ between their predictors, whereas Model 2's predictors are fairly independent. We remove predictors with the highest VIF in models 1 and 3, and re-fit each time until we achieve a VIF measure for each predictor of at most 5 (Max SD inflation tolerated is at most 2). We thus arrive at the following models that are fairly free of _multicollinearity_:  
+
+Model 1: mpg ~ wt + hp + am
+Model 2 (unchanged): mpg ~ wt + qsec + am
+Model 3: mpg ~ drat + qsec + vs + am + gear + carb
+
+### Removing Superfluous Predictors (ANOVA Test)
+
+Model 3 still has too many predictors for my liking. I perform an ANOVA test (starting from a base model mpg ~ drat+am) to remove any predictors that don't inflict a significant change in model variance. 
+
+```{r}
+temp <- lm(mpg~drat+am, data=mtcars)
+temp1 <- update(temp, mpg~drat+qsec+am)
+temp2 <- update(temp, mpg~drat+qsec+vs+am)
+temp3 <- update(temp, mpg~drat+qsec+vs+gear+am)
+temp4 <- update(temp, mpg~drat+qsec+vs+gear+carb+am)
+anova(temp, temp1, temp2, temp3, temp4)
+
+rm(list=c('temp','temp1','temp2','temp3','temp4'))
+```
+
+
+
+```{r}
+model1 <- lm(mpg~wt+hp+am, data=mtcars)
+#model2 <- lm(mpg~wt+hp+am, data=mtcars)
+model3 <- lm(mpg~drat+qsec+carb+am, data=mtcars)
+```
+
+## Residual Diagnostics
+
+Next, we take a loot at some Residual plots to verify that the following assumptions **hold true** for each model:
+
+1. Homoskedasticity
+2. Error terms are approximately normally distributed
+3. Non-systematic Residuals
+4. Id any abnormal leverage points exerting influence
+
+Figure 2.1 generates a grid where a series of residual plots in each column represents one of the competing models. We note the following observations about the models:
+
+Model 1: Linear Correlation Driven | Model 2: Stepwise Algorithm | Model 3: Everything
+mpg ~ ...                          | mpg ~ wt + qsec + am        | mpg ~ ...
+-----------------------------------|-----------------------------|-----------------------------
+Roughly Homoskedastic              | Roughly Homoskedastic       | Roughly Homoskedastic
+Normal with High Outliers          | Normal, More Outliers       | Normal, High and Low Outliers
+Faint Linear Indication            | Some Linear Indication      | Fairly Non-Systematic
+3-4 Potential Leverage Points      | 3-4 Potential Leverage Point| 2 Potential Leverage Points
+
+The residual analysis points to some inherent residual pattern in Model 2 that tells us we're not accounting for some predictor's influence. Overall, Model 3 seems to have a slight edge.
+
+### Evaluating Influence
+
+```{r eval=F}
+M1 <- sort(hatvalues(model1), decreasing = T)
+M2 <- sort(hatvalues(model2), decreasing = T)
+M3 <- sort(hatvalues(model3), decreasing = T)
+
+# cat("Model 1 Potential Influencers \n")
+# knitr::kable(mtcars[rownames(mtcars) %in% c("Maserati Bora", "Chrysler Imperial"),])
+# 
+# cat("Model 2 Potential Influencers \n")
+# knitr::kable(mtcars[rownames(mtcars) %in% c("Merc 230", "Chrysler Imperial", "Fiat 128"),])
+# 
+# cat("Model 3 Potential Influencers \n")
+# knitr::kable(mtcars[rownames(mtcars) %in% c("Merc 230", "Chrysler Imperial", "Pantera"),])
+```
+
+Figure 2.2 shows us the concerning outlier leverage points in each model. Now, I'll evaluate the influence each outlier might exert on the model...
+
+```{r}
+cat("Model 1, Major Leverage and/or Influence \n")
+knitr::kable(which(cooks.distance(model1) > (4/(nrow(mtcars)-3-1)) ) )
+
+cat("Model 2, Major Leverage and/or Influence \n")
+knitr::kable(which(cooks.distance(model2) > (4/(nrow(mtcars)-3-1)) ) )
+
+cat("Model 3, Major Leverage and/or Influence \n")
+knitr::kable(which(cooks.distance(model3) > (4/(nrow(mtcars)-3-1)) ) )
+
+# look at each corresponding observation and make a manual determination on whether or not to remove the outliers.
+```
+
+I'm concerned about leverage points that are farther away (larger hat values) that _also_ exert more influence as shown by the Residual Error. This might cause the regression line to bend unfairly towards that value. 
+
+Model 1: While the "Maserati Bora" has a high hatvalue, it's influence (residual error) is fairly low; the Chrysler may be the only candidate to have a somewhat high leverage and influence.
+
+Model 2: The "Merc 230" is a far leverage point with a high influence. It is a candidate for omission.
+
+Model 3: The "Maserati Bora" is a far leverage point with a high influence. It is a candidate for omission.
+
+After reviewing both candidates, I see no reason to eliminate either record as these are not data entry errors. They are merely extreme specimens of the group. **Thus, no further changes are to be made to the models.**
+
+Model 3 is the cleanest in terms of constant variance, non-systematic residuals, approximate normality of errors and outliers with low influence. I pick it as my best fit model.
+
+
+# Best Fit Model and Results
+
+The best fit model equation looks like...
+
+mpg~drat+qsec+carb+am
+
+
+
+The response in terms of the transmission looks like (box plot/faceted scatter with regression lines) with confidence and prediction interval ribbons.
+The difference between auto and manual is x. This has a 95% conf int of... (t-test)
+Restate Assumptions if space permits
+
+# APPENDICES
+
+## MODEL 1: LINEAR CORRELATIONS
+
+### Figure 1.1: Pairs Plot with Adjusted R^2 and Coefficient Significance
+
+This scatterplot produces a pairs plot with the lower panel showing the adjusted R^2 value between response and predictor, as well as coefficient's p-value.
+
+```{r}
+# First, I write a function (edited from ?pairs) to display the correlation between response-predictor pairs and it's significance. This function adjusts the font size of the text with the strength of correlation:
+panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
+{
+    usr <- par("usr"); on.exit(par(usr))
+    par(usr = c(0, 1, 0, 1))
+    #r <- abs(cor(y, x))
+    r <- signif(summary(lm(y~x))$adj.r.squared, 3)
+    r.p <- signif(summary(lm(y~x))$coef[2,4], 4)
+    #r.p <- signif(cor.test(y, x, alternative="two.sided", method="pearson")$p.value, 4)
+    #p <- round(summary(lm(y~x), data=data.frame(x=x,y=y))$coef[2,4], 4)
+    txt <- format(c(r, 0.123456789), digits = digits)[1]
+    txt <- paste0(prefix, 'A.r2 = ', txt, '\n p-val = ', r.p)
+    if(missing(cex.cor)) cex.cor <- 0.8/strwidth(txt)
+    text(0.5, 0.5, txt, cex = cex.cor * r)
+}
+
+# function to plot an abline in the pairs plot instead of smoother
+panel.line <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
+{
+        temp.fit <- lm(y~x, data=data.frame(x=x, y=y))
+        
+        points(x=x, y=y, pch=21, col='black', bg='yellow')
+        abline(a=temp.fit$coef[1], b=temp.fit$coef[2], lwd=1, col='blue')
+        
+}
+
+#all predictors
+pairs(mpg~., data=mtcars, upper.panel=panel.line, cex=.8,cex.labels=2,font.labels=2, lower.panel=panel.cor)
+``` 
+
+```{r figure1_1, eval=F}
+GGally::ggpairs(data=mtcars, color=mtcars$am,alpha=.2, lower=list(continuous='smooth'), params=c(method='loess'), title="MTCARS LINEAR CORRELATION PAIR CHART: mpg~.")
+```
+
+### Figure 2.1: Residual Diagnostic Plots
+
+Plotting Summary Residual Plots for all 3 Models (4 plots each):
+
+```{r}
+library(gplots)
+
+par(mfcol=c(5,3), mar=(c(3, 0, 0, 1)))
+textplot("Model 1 (Adjusted Rsquared)", cex=1)
+palette(c('cyan','darkgreen','green'))
+plot(model1, pch=21, col='black', bg=mtcars$am)
+
+textplot("Model 2 (Stepwise Reg.)", cex=1)
+palette(c('cyan','darkgreen','green'))
+plot(model2, pch=21, col='black', bg=mtcars$am)
+
+textplot("Model 3 (All Predictors)", cex=1)
+palette(c('cyan','darkgreen','green'))
+plot(model3, pch=21, col='black', bg=mtcars$am)
+```
+
+### Figure 2.2: Influence and Leverage
+
+Closer look at Leverage points (hatvalues) for each model
+```{r eval=F}
+boxplot(M1, M2, M3)
+text(x=1, y=boxplot(M1, plot=F)$out, labels=names(boxplot(M1, plot=F)[4][[1]]))
+text(x=2, y=boxplot(M2, plot=F)$out, labels=names(boxplot(M2, plot=F)[4][[1]]))
+text(x=3, y=boxplot(M3, plot=F)$out, labels=names(boxplot(M3, plot=F)[4][[1]]))
+```
+
+```{r}
+par(mfrow=c(3,1), mar=c(5, 5, 2, 3))
+influencePlot(model1, id.col='blue')
+influencePlot(model2, id.col='darkgreen')
+influencePlot(model3, id.col='brown')
+```
+
