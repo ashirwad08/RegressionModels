@@ -1,7 +1,7 @@
 ---
-title: "Motor Trends Dataset MPG Analysis"
+title: MPG Analysis on Motor Trends Data"
 author: "Ash Chakraborty"
-date: "July 20, 2015"
+date: "July 24, 2015"
 output: html_document:
         toc: true
         theme: cosmo
@@ -13,71 +13,79 @@ knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE, error=FALSE, hig
 library(datasets)
 data("mtcars")
 library(car)
-library(GGally)
+#library(GGally)
 library(gplots)
+mtcars$am <- as.factor(Recode(mtcars$am, "0='Automatic';1='Manual'"))
 ```
 
 # Executive Statement
 
-- We look at mtcars data, 32 observations of 11 variables, collected for 1973-74 models
-- Specifically we want to understand and quantify the impact on MPG by automatic versus manual transmission vehicles
-- It's not straightforward, there are some confounders, so we have to pit some models against each other and eliminate them until we find the best one.
-- Once found, we'll quantify the impact on MPG by Manual and Auto transmission vehicles, and see if this difference is significant. 
+This report looks for the impact on vehicle Miles Per Gallon (MPG) by transmission type (automatic Vs. manual). The dataset used is _Motor Trend_ magazine's _mtcars_ dataset of 1973-74 models.  
+Multivariate regression analysis is the strategy used to build competing models in an attempt to incorporate any predictors that confound transmission type's relationship with MPG.
 
-# Building Models
+The report concludes _with 95% confidence_ that vehicles with manual transmissions have a statistically significant advantage of **between 0.05 to 5.83 MPG** (holding all other predictors constant) over vehicles that have an automatic transmission. The mean advantage observed in this dataset is **2.94 MPG**.
 
-Since we have the one response variable that we're trying to predict for - "MPG" - we have 10 remaining variables. All of these could be considered as potential predictors of MPG. We attempt to pursue different strategies to pick the most promising potential predictors and therefore, as a first step, build competing models.
+# Competing Models
 
-## MODEL 1 (Linear Correlation): Most Correlated Response-Predictor Pairs
+## MODEL 0: Base Model
 
-For the first model, we look at scatter plots of the response - MPG - against every potential predictor in Figure 1.1. We filter predictors based on the following criteria:  
-- Adjusted R^2
-- Slope coefficient that's significant. 
-- Approximate linear relationship with fitted line, few outliers accepted.
-
-We thus arrive at the model (including "am" by default), in decreasing strength of R2:
-
-mpg ~ wt + cyl + disp + hp + am
-```{r}
-model1 <- lm(mpg~wt+cyl+disp+hp+am, data=mtcars)
-```
-
-
-## MODEL 2 (STEPWISE ADDITION/ELIMINATION): Arriving at Ideal AIC Score
-
-The stepwise function will be called on the _mpg~._ model to iterate through _Forward Addition_ and _Backwards Elimination_ procedures and pick the models with the most optimal AIC value:  
+We begin by taking the absolute basic model possible in terms of the response - MPG - and the predictor under investigation - transmission. 
 
 ```{r}
-model2.step <- step(lm(mpg~., data=mtcars), direction="both", trace=FALSE)
-model2.step$coefficients
-model2 <- lm(mpg~wt+qsec+am, data=mtcars)
+model0 <- lm(mpg~am, data=mtcars)
+knitr::kable(summary(model0)$coef)
 ```  
 
-We see that the most optimal model coming out of Stepwise Addition/Elimination is 
+MODEL 0, **mpg = `r signif(summary(model0)$coef[1,1], 3)` + `r signif(summary(model0)$coef[2,1], 3)` . am**
 
-mpg ~ wt + qsec + am.
+Note: Although this model suggests a significant difference of `r signif(summary(model0)$coef[2,1], 3)` in MPG for manual transmissions as opposed to automatics, the poor R^2^ value is cause for concern. Moreover, a residual plot shows a pattern in error terms, indicating known/unknown confounders. This begs deeper investigation.
 
+## MODEL 1 (STEPWISE ADDITION/ELIMINATION): Arriving at Ideal AIC Value
 
-## MODEL 3 (Correlation and VIF Analysis)
-
-This model uses the top most significantly correlated potential predictors to the response variable, and then performs a _Multicollinearity_ analysis on these to weed out any predictors that cause alarming variance inflation. 
-
-In order to extract the initial model, I extract the top predictors most correlated with the response:
-
-
-After performing a nested VIF analysis by inserting each predictor if VIF allows it, I get the suggested equation: 
-
-
-
-## MODEL 4: Fit All
-
-This model simply fits all! 
-
-mpg ~ cyl + disp + hp + drat + wt + qsec + vs + am + gear + carb
+In order to consider the entire spectrum of possible predictors in the dataset (all are potentials), we perform a step-wise regression on all potential predictors (_mpg~._ model) to iterate through each predictor and fit those with the most optimal AIC value:  
 
 ```{r}
-model3 <- lm(mpg~., data=mtcars)
+model1.step <- step(lm(mpg~., data=mtcars), direction="both", trace=FALSE)
+knitr::kable(model1.step$coef)
+model1 <- lm(mpg~wt+qsec+am, data=mtcars)
+```  
+
+The most optimal model coming out of Stepwise Addition/Elimination is:  
+
+MODEL 1: **mpg = `r signif(summary(model1)$coef[1,1], 3)` - `r signif(summary(model1)$coef[2,1], 3)` . wt + `r signif(summary(model1)$coef[3,1], 3)` . qsec + `r signif(summary(model1)$coef[4,1], 3)` . am**   
+
+Thus, two more predictors have been added to the base model. Note: There's a concern here that the mean MPG for automatic transmissions (the intercept), holding other predictors constant, is _not_ significant.
+
+## MODEL 2 (Linear Correlation): Most Correlated Response-Predictor Pairs
+
+The concern above has led us to look for yet other means of explaining confounding predictors. We turn to linear relationship with the response to help us pick likely candidates. We thus take a look at scatter plots of the response - MPG - against every potential predictor in Figure 1.1 (appendix). We filter predictors based on the following criteria:  
+
+- High _Adjusted R^2^_ (showing a high linear relationship with response)
+- Slope coefficient that's significant. 
+- Approximate linear relationship with fitted line, few outliers acceptable.  
+
+The candidate predictors from Figure 1.1 to be added to the base model are thus (in decreasing strength of R^2^): **wt, cyl, disp, hp, and drat**. We now use the stepwise addition/elimination process on the potential equation, mpg ~ am + wt + cyl + disp + hp + drat. We get:  
+
+```{r}
+model2.step <- step(lm(mpg~am+wt+cyl+disp+hp+drat, data=mtcars), direction="both", trace=FALSE)
+knitr::kable(model2.step$coef)
 ```
+
+We are compelled to force "am" into the model, and thus extract the result from the second-last step the procedure above. Finally, as a guard against _Multicollinearity_. We achieve this by performing a Variance Inflation Test between the predictors and eliminating those that show an abnormal bump in standard deviation:  
+
+```{r}
+cat("SD Inflation for Model 2: \n")
+knit::kable(sqrt(vif(lm(mpg~am+wt+cyl+hp, data=mtcars))))
+```  
+
+After removing the interrelated predictor we arrive at a fairly orthogonal predictor set:
+```{r}
+model2 <- lm(mpg~wt+hp+am, data=mtcars)
+```  
+
+MODEL 2, **mpg = `r signif(summary(model2)$coef[1,1], 3)` - `r signif(summary(model1)$coef[2,1], 3)` . wt - `r signif(summary(model1)$coef[3,1], 3)` . hp + `r signif(summary(model1)$coef[4,1], 3)` . am**   
+
+Note: There's a concern here that the mean MPG difference for manual transmissions, holding other predictors constant, is _not_ significant.
 
 # Refining Models
 
@@ -86,44 +94,36 @@ model3 <- lm(mpg~., data=mtcars)
 Is there any relationship between predictors? I'll test the Variance Inflation in each model.
 
 ```{r}
+cat('Base Model 0 has only one Predictor. \n')
+#knitr::kable(vif(model1))
+
 cat('Model 1 \n')
-knitr::kable(vif(model1))
+knitr::kable(sqrt(vif(model1)))
 
 cat('Model 2 \n')
-knitr::kable(vif(model2))
-
-cat('Model 3 \n')
-knitr::kable(vif(model3))
+knitr::kable(sqrt(vif(model2)))
 ```  
-
-We see Models 1 and 3 exhibit _multicollinearity_ between their predictors, whereas Model 2's predictors are fairly independent. We remove predictors with the highest VIF in models 1 and 3, and re-fit each time until we achieve a VIF measure for each predictor of at most 5 (Max SD inflation tolerated is at most 2). We thus arrive at the following models that are fairly free of _multicollinearity_:  
-
-Model 1: mpg ~ wt + hp + am
-Model 2 (unchanged): mpg ~ wt + qsec + am
-Model 3: mpg ~ drat + qsec + vs + am + gear + carb
+None of the models unders consideration have codependent predictors.
 
 ### Removing Superfluous Predictors (ANOVA Test)
 
-Model 3 still has too many predictors for my liking. I perform an ANOVA test (starting from a base model mpg ~ drat+am) to remove any predictors that don't inflict a significant change in model variance. 
+ANOVA test for Model 1 and Model 2
 
 ```{r}
-temp <- lm(mpg~drat+am, data=mtcars)
-temp1 <- update(temp, mpg~drat+qsec+am)
-temp2 <- update(temp, mpg~drat+qsec+vs+am)
-temp3 <- update(temp, mpg~drat+qsec+vs+gear+am)
-temp4 <- update(temp, mpg~drat+qsec+vs+gear+carb+am)
-anova(temp, temp1, temp2, temp3, temp4)
+temp <- lm(mpg~am, data=mtcars)
+temp1 <- update(temp, mpg~am+wt)
+temp2 <- update(temp, mpg~am+wt+qsec)
+temp3 <- update(temp, mpg~am+wt+hp)
 
-rm(list=c('temp','temp1','temp2','temp3','temp4'))
+cat("Model 1 ANOVA: \n")
+knitr::kable(anova(temp, temp1, temp2))
+
+cat("Model 2 ANOVA: \n")
+knitr::kable(anova(temp, temp1, temp3))
+
+rm(list=c('temp','temp1','temp2','temp3'))
 ```
-
-
-
-```{r}
-model1 <- lm(mpg~wt+hp+am, data=mtcars)
-#model2 <- lm(mpg~wt+hp+am, data=mtcars)
-model3 <- lm(mpg~drat+qsec+carb+am, data=mtcars)
-```
+We see that in each model, adding the predictors causes significant change in the sum of squares measure. THe models thus stand.
 
 ## Residual Diagnostics
 
@@ -195,7 +195,7 @@ Model 3 is the cleanest in terms of constant variance, non-systematic residuals,
 
 The best fit model equation looks like...
 
-mpg~drat+qsec+carb+am
+mpg~am+wt+hp
 
 
 
@@ -254,17 +254,17 @@ Plotting Summary Residual Plots for all 3 Models (4 plots each):
 library(gplots)
 
 par(mfcol=c(5,3), mar=(c(3, 0, 0, 1)))
-textplot("Model 1 (Adjusted Rsquared)", cex=1)
+textplot("Model 0 (Base)", cex=1)
+palette(c('cyan','darkgreen','green'))
+plot(model0, pch=21, col='black', bg=mtcars$am)
+
+textplot("Model 1 (All Predictors, Step)", cex=1)
 palette(c('cyan','darkgreen','green'))
 plot(model1, pch=21, col='black', bg=mtcars$am)
 
-textplot("Model 2 (Stepwise Reg.)", cex=1)
+textplot("Model 2 (Correlation, Step)", cex=1)
 palette(c('cyan','darkgreen','green'))
 plot(model2, pch=21, col='black', bg=mtcars$am)
-
-textplot("Model 3 (All Predictors)", cex=1)
-palette(c('cyan','darkgreen','green'))
-plot(model3, pch=21, col='black', bg=mtcars$am)
 ```
 
 ### Figure 2.2: Influence and Leverage
@@ -279,8 +279,8 @@ text(x=3, y=boxplot(M3, plot=F)$out, labels=names(boxplot(M3, plot=F)[4][[1]]))
 
 ```{r}
 par(mfrow=c(3,1), mar=c(5, 5, 2, 3))
-influencePlot(model1, id.col='blue')
-influencePlot(model2, id.col='darkgreen')
-influencePlot(model3, id.col='brown')
+influencePlot(model0, id.col='blue')
+influencePlot(model1, id.col='darkgreen')
+influencePlot(model2, id.col='brown')
 ```
 
