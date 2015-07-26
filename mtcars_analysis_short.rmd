@@ -10,7 +10,7 @@ output:
 
 ```{r global_options, echo=FALSE, warning=FALSE, message=FALSE, error=FALSE, fig.path="/Figures"}
 library(knitr)
-library(kfigr)
+#library(kfigr)
 knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE, error=FALSE, highlight=TRUE)
 library(datasets)
 data("mtcars")
@@ -25,11 +25,11 @@ mtcars$am <- as.factor(Recode(mtcars$am, "0='Automatic';1='Manual'"))
 
 This report looks for the impact of transmission type (automatic or manual) on vehicle Miles Per Gallon (MPG). The dataset used is _Motor Trend_ magazine's _mtcars_ dataset of 1973-74 models. Multivariate regression analysis is the strategy used to build competing models in an attempt to incorporate any predictors that confound transmission's relationship with MPG.
 
-The report concludes, _with 95% confidence_, that vehicles with manual transmissions have a statistically significant advantage of **between 0.05 to 5.83 MPG** (holding all other predictors constant) over vehicles that have an automatic transmission. The mean advantage for manuals observed in this dataset is **2.94 MPG**.
+The report concludes, _with 95% confidence_, that vehicles with manual transmissions have a statistically significant advantage of **between 0.05 to 5.83 MPG** (holding all other predictors constant) over vehicles that have an automatic transmission. The mean advantage for manuals observed in this dataset is **2.94 MPG**. Note: The code and complete analysis may be found at my [github repo](https://github.com/ashirwad08/RegressionModels/blob/master/mtcars_analysis.Rmd).
 
 # EXPLORATORY ANALYSIS
 
-The _mtcars_ dataset contains 32 observations across 11 variables. We take an initial look at the relationship between our focus of inquiry: MPG and Transmission Type. See the _violin plot_ in ```r figr("plot1_1", type='figure')`Figure 1.1 (appendix). We immediately note that there is non-constant variance between the two groups.  
+The _mtcars_ dataset contains 32 observations across 11 variables. We take an initial look at the relationship between our focus of inquiry: MPG and Transmission Type. See the _violin plot_ in *Figure 1.1* (appendix). We immediately note that there is non-constant variance between the two groups.  
 
 # COMPETING MODELS
 
@@ -44,7 +44,7 @@ model0 <- lm(mpg~am, data=mtcars)
 
 MODEL 0, **mpg = `r signif(summary(model0)$coef[1,1], 3)` + `r signif(summary(model0)$coef[2,1], 3)` * amManual**  
 
-Although this model suggests a significant difference of `r signif(summary(model0)$coef[2,1], 3)` in MPG for manual transmissions over automatics, the poor _adjusted R^2^_ value of *0.33* is cause for concern. Moreover, the non-constant variance shown in Figure 1.1 pretty much renders this model as unsuitable. _We keep it around for baseline comparisons only._
+Although this model suggests a significant difference of `r signif(summary(model0)$coef[2,1], 3)` in MPG for manual transmissions over automatics, the poor _adjusted R^2^_ value of *0.33* is cause for concern. Moreover, the non-constant variance shown in *Figure 1.1* pretty much renders this model as unsuitable. _We keep it around for baseline comparisons only._
 
 ## Model 1: Step-wise Addition/Elimination
 
@@ -59,7 +59,7 @@ _Note:_ There's a concern here that the mean MPG for automatic transmissions (th
 
 ## Model 2: Linear Correlation + Step + VIF
 
-We turn to linear relationship with the response to help us pick likely predictors (_Figure 1.2_, as shown by _adjusted R^2^_, and a significant coefficient). The following candidates emerge (in decreasing strength of R^2^): **wt, cyl, disp, hp, and drat**. We then use the _step-wise_ addition/elimination process on these candidates, combined with a *VIF* analysis to eliminate _multicollinearity_; we get the equation: $mpg ~ am + wt + hp$.
+We turn to linear relationship with the response to help us pick likely predictors (*Figure 1.2*, as shown by _adjusted R^2^_, and a significant coefficient). The following candidates emerge (in decreasing strength of R^2^): **wt, cyl, disp, hp, and drat**. We then use the _step-wise_ addition/elimination process on these candidates, combined with a *VIF* analysis to eliminate _multicollinearity_; we get the equation: $mpg ~ am + wt + hp$.
 
 ```{r}
 model2.step <- step(lm(mpg~am+wt+cyl+disp+hp+drat, data=mtcars), direction="both", trace=FALSE)
@@ -79,7 +79,7 @@ _Note:_ There's a concern here that the mean MPG difference for manual transmiss
 
 ## Variance of Means Test
 
-We want to be certain that the predictors added to each model cause a significant difference in the sum of squares and overall variation. We verify this with an ANOVA test for Models 1 and 2 (*ONLY 1 is SHOWN*):
+We want to be certain that the predictors added to each model cause a significant difference in the sum of squares and overall variation. We verify this with an ANOVA test for Models 1 and 2 (**ONLY 1 is SHOWN**):
 
 ```{r}
 temp <- lm(mpg~am, data=mtcars)
@@ -94,15 +94,15 @@ knitr::kable(anova(temp, temp1, temp2), caption='Model 1 ANOVA Test')
 rm(list=c('temp','temp1','temp2','temp3'))
 ```  
 
-We see that in each model (entire code available at github repo), adding the predictors causes significant change in group variance.
+We see that in each model (entire code available at my [github repo](https://github.com/ashirwad08/RegressionModels/blob/master/mtcars_analysis.Rmd)), adding the predictors causes significant change in group variance.
 
 ## Residual Diagnostics
 
-Finally, we take a loot at some Residual plots (_Figure 2.1_). The residual analysis shows us that Models 1 and 2 are roughly homoskedastic, while their residuals approximate a normal distribution. Model 2, however, does have some outliers far away from the quantile line. These need to be investigated. Model 1 also has some outliers that need a closer look. _Can we eliminate these?_
+Finally, we take a loot at some Residual plots (*Figure 2.1*). The residual analysis shows us that Models 1 and 2 are roughly homoskedastic, while their residuals approximate a normal distribution. Model 2, however, does have some outliers far away from the quantile line. These need to be investigated. Model 1 also has some outliers that need a closer look. _Can we eliminate these?_
 
 ## Evaluating Influence  
 
-_Figure 2.1_ also shows us some leverage points for Models 1 and 2. We're concerned about leverage points that _also_ exert more influence on the model; this might cause the regression line to bend unfairly towards such values. In order to quantify this combination of influence and leverage, we see the major _Cook's Distance_ measures for each such leverage point (*ONLY 1 is SHOWN*):  
+*Figure 2.1* also shows us some leverage points for Models 1 and 2. We're concerned about leverage points that _also_ exert more influence on the model; this might cause the regression line to bend unfairly towards such values. In order to quantify this combination of influence and leverage, we see the major _Cook's Distance_ measures for each such leverage point (**ONLY model 2 is SHOWN**):  
 
 ```{r}
 #knitr::kable(which(cooks.distance(model0) > (4/(nrow(mtcars)-3-1)) ), col.names = "Model 0: Cook's Dist.")
@@ -127,13 +127,14 @@ The average MPG for vehicles with manual transmissions - while holding weight, q
 ```{r eval=F}
 knitr::kable(confint(model1), caption = 'Confidence Intervals for Coefficients of Model 1')
 ```
-Finally, _Figure 3_ summarizes the relationship between the automatic and manual transmission groups in the 3d scatter. We see that the best fit plane of both groups have different slopes, as suggested by our model. It's interesting to note that heavier cars seem to have automatic transmissions.
+Finally, *Figure 3* summarizes the relationship between the automatic and manual transmission groups in the 3d scatter. We see that the best fit plane of both groups have different slopes, as suggested by our model. It's interesting to note that heavier cars seem to have automatic transmissions.
 
-**END OF REPORT**  
+
+***  
 
 # APPENDIX  
 
-*Entire markdown, including my code is available at my github repo.*
+Entire markdown, including my code is available at my [github repo](https://github.com/ashirwad08/RegressionModels/blob/master/mtcars_analysis.Rmd).
 
 ## Figure 1.1: Violin Plot Exploring MPG Vs. Transmission
 
@@ -151,7 +152,7 @@ g1
 
 This scatterplot produces a pairs plot with the lower panel showing the _adjusted R^2^_ value between response and predictor, as well as the coefficient's p-value. The font size increases by strength of the correlation. 
 
-```{r fig.width=8, fig.height=5}
+```{r fig.width=8, fig.height=6}
 # First, I write a function (edited from ?pairs) to display the correlation between response-predictor pairs and it's significance. This function adjusts the font size of the text with the strength of correlation:
 panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
 {
@@ -184,7 +185,7 @@ pairs(mpg~., data=mtcars, upper.panel=panel.line, cex=1,cex.labels=2,font.labels
 
 ## Figure 2.1: Residual Diagnostic Plots
 
-We plot 4 Residual diagnostics for each model in each column of the grid below:  
+We plot 3 Residual diagnostics for each model in each column of the grid below:  
 
 ```{r fig.height=6}
 #library(gplots)
@@ -202,6 +203,8 @@ palette(c('cyan','green', 'black'))
 plot(model2, pch=21, col='black', bg=mtcars$am)
 ```
 
+*Influence Plots* (not shown) may be [seen here](https://github.com/ashirwad08/RegressionModels/blob/master/Model%201%20and%202%20Influence%20Plots.png).  
+
 ```{r eval=F, fig.height=4}
 par(mfrow=c(2,1), mar=c(5, 5, 2, 3))
 #influencePlot(model0, id.col='blue')
@@ -215,9 +218,9 @@ Finally, we visualize a 3D scatter of our best fit model. The red plane shows th
 
 **mpg = `r signif(summary(model1)$coef[1,1], 3)` `r signif(summary(model1)$coef[2,1], 3)` * wt + `r signif(summary(model1)$coef[3,1], 3)` * qsec + `r signif(summary(model1)$coef[4,1], 3)` * amManual**   
 
-<img src = "c:/Users/ash/Documents/R/Regression Models/mtcars analysis 3d scatter 1.png"></img>
+![3d Scatter](mtcars analysis 3d scatter 1.png)
 
-```{r}
+```{r eval=F}
 # g2 <- ggplot(data=mtcars, aes(x=qsec, y=mpg, size=wt, col=am))
 # g2 + geom_point() +
 #         geom_abline(intercept = coef(model1)[1], slope=coef(model1)[2]+coef(model1)[3]) +
@@ -232,5 +235,7 @@ plot3d <- scatterplot3d(z=mtcars$mpg, x=mtcars$wt, y=mtcars$qsec, pch=19, type='
 # plane.auto <- plane3d(coef(model1)[1], x.coef=coef(model1)[2], y.coef=coef(model1)[3], lty='dashed')
 plot3d$plane3d(coef(model1)[1]+coef(model1)[4], x.coef=coef(model1)[2]+coef(model1)[5], y.coef=coef(model1)[3]+coef(model1)[6], lty='solid', col='blue')
 plot3d$plane3d(coef(model1)[1], x.coef=coef(model1)[2], y.coef=coef(model1)[3], lty = 'solid', col='green')
-```
+```   
+
+Note: _Knitr_ has a bug rendering my second regression plane on the 3d plot, so I inserted an image instead. The code for the plot may be seen at my [github repo](https://github.com/ashirwad08/RegressionModels/blob/master/mtcars_analysis.Rmd).
 
