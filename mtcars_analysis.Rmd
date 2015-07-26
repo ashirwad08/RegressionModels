@@ -2,9 +2,9 @@
 title: MPG Analysis on Motor Trends Data"
 author: "Ash Chakraborty"
 date: "July 24, 2015"
-output: html_document:
-        toc: true
-        theme: cosmo
+output: 
+        html_document:
+                theme: cosmo
 ---
 
 ```{r global_options, echo=FALSE, warning=FALSE, message=FALSE, error=FALSE, fig.path="/Figures"}
@@ -75,7 +75,7 @@ We are compelled to force "am" into the model, and thus extract the result from 
 
 ```{r}
 cat("SD Inflation for Model 2: \n")
-knit::kable(sqrt(vif(lm(mpg~am+wt+cyl+hp, data=mtcars))))
+knitr::kable(sqrt(vif(lm(mpg~am+wt+cyl+hp, data=mtcars))))
 ```  
 
 After removing the interrelated predictor we arrive at a fairly orthogonal predictor set:
@@ -89,25 +89,9 @@ Note: There's a concern here that the mean MPG difference for manual transmissio
 
 # Refining Models
 
-## Looking for Non-Multicollinearity
+## Verify Significant Deviations (ANOVA)
 
-Is there any relationship between predictors? I'll test the Variance Inflation in each model.
-
-```{r}
-cat('Base Model 0 has only one Predictor. \n')
-#knitr::kable(vif(model1))
-
-cat('Model 1 \n')
-knitr::kable(sqrt(vif(model1)))
-
-cat('Model 2 \n')
-knitr::kable(sqrt(vif(model2)))
-```  
-None of the models unders consideration have codependent predictors.
-
-### Removing Superfluous Predictors (ANOVA Test)
-
-ANOVA test for Model 1 and Model 2
+We want to be certain that the predictors added to each model cause a significant difference in the sum of squares and overall variation:
 
 ```{r}
 temp <- lm(mpg~am, data=mtcars)
@@ -123,28 +107,28 @@ knitr::kable(anova(temp, temp1, temp3))
 
 rm(list=c('temp','temp1','temp2','temp3'))
 ```
-We see that in each model, adding the predictors causes significant change in the sum of squares measure. THe models thus stand.
+We see that in each model, adding the predictors causes significant change in the sum of squares measure. Both models 1 and 2 have fairly orthogonal and influential predictors.
 
 ## Residual Diagnostics
 
-Next, we take a loot at some Residual plots to verify that the following assumptions **hold true** for each model:
+Finally, we take a loot at some Residual plots to verify that the following assumptions **hold true** for each model:
 
-1. Homoskedasticity
+1. Homoskedasticity of residuals around fitted line
 2. Error terms are approximately normally distributed
-3. Non-systematic Residuals
+3. Non-systematic residuals (no apparent patterns)
 4. Id any abnormal leverage points exerting influence
 
-Figure 2.1 generates a grid where a series of residual plots in each column represents one of the competing models. We note the following observations about the models:
+Figure 2.1 generates a grid where a series of residual plots in each column represents each competing model. We note the following observations about the models:
 
-Model 1: Linear Correlation Driven | Model 2: Stepwise Algorithm | Model 3: Everything
-mpg ~ ...                          | mpg ~ wt + qsec + am        | mpg ~ ...
------------------------------------|-----------------------------|-----------------------------
-Roughly Homoskedastic              | Roughly Homoskedastic       | Roughly Homoskedastic
-Normal with High Outliers          | Normal, More Outliers       | Normal, High and Low Outliers
-Faint Linear Indication            | Some Linear Indication      | Fairly Non-Systematic
-3-4 Potential Leverage Points      | 3-4 Potential Leverage Point| 2 Potential Leverage Points
+Model 0: Base                      | Model 1: Step (All Predictors) | Model 2: Step (Correlated Predictors)
+mpg ~ am                           | mpg ~ wt + qsec + am           | mpg ~ wt + hp + am
+-----------------------------------|-----------------------------   |-----------------------------
+Some Variance Between Groups       | Roughly Homoskedastic          | Roughly Homoskedastic
+Normally Distributed               | Normal, High Outliers          | Normal, High Outliers
+Faint Linear Indication            | Roughly Pattern Free           | Roughly Pattern Free
+N/A                                | 3 Potential Leverage Points    | 3 Potential Leverage Points
 
-The residual analysis points to some inherent residual pattern in Model 2 that tells us we're not accounting for some predictor's influence. Overall, Model 3 seems to have a slight edge.
+THe residual analysis shows us that Models 1 and 2 are roughly homoskedastic, while their residuals approximate a normal distribution. Model 2, however, does have some extreme outliers far away from the quantile line. These need to be investigated. Model 1 also has some outliers that need a closer look.
 
 ### Evaluating Influence
 
@@ -163,45 +147,40 @@ M3 <- sort(hatvalues(model3), decreasing = T)
 # knitr::kable(mtcars[rownames(mtcars) %in% c("Merc 230", "Chrysler Imperial", "Pantera"),])
 ```
 
-Figure 2.2 shows us the concerning outlier leverage points in each model. Now, I'll evaluate the influence each outlier might exert on the model...
+Figure 2.2 shows us the concerning leverage points in each model. We're concerned about leverage points that are farther away (larger hat values) that _also_ exert more influence as shown by the deviation from the standardized residuals in the influence plots in figure 2.2. This might cause the regression line to bend unfairly towards such values. In order to quantify this combination of influence and leverage, we list the highest _Cook's Distance_ measures for each such leverage point:  
 
 ```{r}
-cat("Model 1, Major Leverage and/or Influence \n")
+cat("Model 0, Major Leverage + Influence Points \n")
+knitr::kable(which(cooks.distance(model0) > (4/(nrow(mtcars)-3-1)) ) )
+
+cat("Model 1, Major Leverage + Influence Points \n")
 knitr::kable(which(cooks.distance(model1) > (4/(nrow(mtcars)-3-1)) ) )
 
-cat("Model 2, Major Leverage and/or Influence \n")
+cat("Model 2, Major Leverage + Influence Points \n")
 knitr::kable(which(cooks.distance(model2) > (4/(nrow(mtcars)-3-1)) ) )
-
-cat("Model 3, Major Leverage and/or Influence \n")
-knitr::kable(which(cooks.distance(model3) > (4/(nrow(mtcars)-3-1)) ) )
 
 # look at each corresponding observation and make a manual determination on whether or not to remove the outliers.
 ```
 
-I'm concerned about leverage points that are farther away (larger hat values) that _also_ exert more influence as shown by the Residual Error. This might cause the regression line to bend unfairly towards that value. 
-
-Model 1: While the "Maserati Bora" has a high hatvalue, it's influence (residual error) is fairly low; the Chrysler may be the only candidate to have a somewhat high leverage and influence.
-
-Model 2: The "Merc 230" is a far leverage point with a high influence. It is a candidate for omission.
-
-Model 3: The "Maserati Bora" is a far leverage point with a high influence. It is a candidate for omission.
-
-After reviewing both candidates, I see no reason to eliminate either record as these are not data entry errors. They are merely extreme specimens of the group. **Thus, no further changes are to be made to the models.**
-
-Model 3 is the cleanest in terms of constant variance, non-systematic residuals, approximate normality of errors and outliers with low influence. I pick it as my best fit model.
+The concerning leverage points are those which also exert a large influence on the corresponding model. From the influence plots we see that the _Merc 230_ and _Chrysler Imperial_ are high leverage points that have a greater standard residual error, thus exerting a greater influence on the model. Similarly, the Chrysler Imperial and Maserati Bora are candidates for Model 2. In reviewing these records, however, there is no indication of an erroneous data point. These are merely extreme specimens of a combination of predictor values. We choose to err on the side of caution and be cautious with our regression assumptions by choosing _not_ to remove these data points from our models.  
 
 
 # Best Fit Model and Results
 
-The best fit model equation looks like...
-
-mpg~am+wt+hp
+Given the Refining excercise above, we see that Model 1 has a slight advantage over Model 2 and both models are far better than Model 0 in terms of the _adjusted R^2^_. Moreover, the overall outlier exertion on the model (judged in terms of the cook's distance) seems to be slightly better for Model 1. We therefore choose model 1 to represent our best fit model in this multivariate analysis:  
 
 
+BEST FIT MODEL: **mpg = `r signif(summary(model1)$coef[1,1], 3)` - `r signif(summary(model1)$coef[2,1], 3)` . wt + `r signif(summary(model1)$coef[3,1], 3)` . qsec + `r signif(summary(model1)$coef[4,1], 3)` . am**   
 
-The response in terms of the transmission looks like (box plot/faceted scatter with regression lines) with confidence and prediction interval ribbons.
-The difference between auto and manual is x. This has a 95% conf int of... (t-test)
-Restate Assumptions if space permits
+## Results
+
+We summarize our the relationships expressed by our model as follows: The average MPG for vehicles with manual transmissions - while holding "wt", "qsec", and the automatic transmission coefficients constant - sees an advantage of **2.94 Miles Per Gallon** over the automatic transmissions in this dataset. Furthermore, we state with _95% confidence_ that manual transmissions enjoy a positive advantage in the range of **0.05 to 5.83 MPG** over their automatic counterparts, while holding weight and qsec values constant at the coefficients shown by the equation above. We see this confidence interval generated below: 
+
+```{r}
+knitr::kable(confint(model1))
+```
+
+Finally, the Figure 3 sums up the relationship between the automatic and manual transmission groups in the 3d scatter. We see that the best fit plane of both groups vary significantly as suggested by our model.
 
 # APPENDICES
 
