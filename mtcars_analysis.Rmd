@@ -1,10 +1,11 @@
 ---
-title: MPG Analysis on Motor Trends Data"
+title: "MPG Analysis on Motor Trends Data"
 author: "Ash Chakraborty"
 date: "July 24, 2015"
-output: 
-        html_document:
-                theme: cosmo
+output:
+  pdf_document: default
+  html_document:
+    theme: cosmo
 ---
 
 ```{r global_options, echo=FALSE, warning=FALSE, message=FALSE, error=FALSE, fig.path="/Figures"}
@@ -20,76 +21,74 @@ mtcars$am <- as.factor(Recode(mtcars$am, "0='Automatic';1='Manual'"))
 
 # Executive Statement
 
-This report looks for the impact on vehicle Miles Per Gallon (MPG) by transmission type (automatic Vs. manual). The dataset used is _Motor Trend_ magazine's _mtcars_ dataset of 1973-74 models.  
-Multivariate regression analysis is the strategy used to build competing models in an attempt to incorporate any predictors that confound transmission type's relationship with MPG.
+This report looks for the impact of transmission type (automatic Vs. manual) on vehicle Miles Per Gallon (MPG). The dataset used is _Motor Trend_ magazine's _mtcars_ dataset of 1973-74 models. Multivariate regression analysis is the strategy used to build competing models in an attempt to incorporate any predictors that confound transmission's relationship with MPG.
 
-The report concludes _with 95% confidence_ that vehicles with manual transmissions have a statistically significant advantage of **between 0.05 to 5.83 MPG** (holding all other predictors constant) over vehicles that have an automatic transmission. The mean advantage observed in this dataset is **2.94 MPG**.
+The report concludes, _with 95% confidence_, that vehicles with manual transmissions have a statistically significant advantage of **between 0.05 to 5.83 MPG** (holding all other predictors constant) over vehicles that have an automatic transmission. The mean advantage for manuals observed in this dataset is **2.94 MPG**.
 
 # Competing Models
 
 ## MODEL 0: Base Model
 
-We begin by taking the absolute basic model possible in terms of the response - MPG - and the predictor under investigation - transmission. 
+We begin by taking the absolute basic model possible in terms of the response - MPG - and the predictor under investigation - transmission. We get the following coefficients:  
 
 ```{r}
 model0 <- lm(mpg~am, data=mtcars)
 knitr::kable(summary(model0)$coef)
 ```  
 
-MODEL 0, **mpg = `r signif(summary(model0)$coef[1,1], 3)` + `r signif(summary(model0)$coef[2,1], 3)` . am**
+MODEL 0, **mpg = `r signif(summary(model0)$coef[1,1], 3)` + `r signif(summary(model0)$coef[2,1], 3)` * amManual**
 
-Note: Although this model suggests a significant difference of `r signif(summary(model0)$coef[2,1], 3)` in MPG for manual transmissions as opposed to automatics, the poor R^2^ value is cause for concern. Moreover, a residual plot shows a pattern in error terms, indicating known/unknown confounders. This begs deeper investigation.
+_Note:_ Although this model suggests a significant difference of `r signif(summary(model0)$coef[2,1], 3)` in MPG for manual transmissions as opposed to automatics, the poor _adjusted R^2^_ value of *0.33* is cause for concern. Moreover, a residual plot (figure 2) shows a pattern in error terms, indicating known/unknown confounders. We thus look for alternative models.
 
-## MODEL 1 (STEPWISE ADDITION/ELIMINATION): Arriving at Ideal AIC Value
+## MODEL 1 (STEP addition/elimination)
 
-In order to consider the entire spectrum of possible predictors in the dataset (all are potentials), we perform a step-wise regression on all potential predictors (_mpg~._ model) to iterate through each predictor and fit those with the most optimal AIC value:  
+In order to consider the entire spectrum of possible predictors in the dataset (all are potentials), we perform a step-wise regression on all potential predictors (_mpg ~ ._):  
 
 ```{r}
 model1.step <- step(lm(mpg~., data=mtcars), direction="both", trace=FALSE)
-knitr::kable(model1.step$coef)
+knitr::kable(model1.step$coef, col.names = 'estimate')
 model1 <- lm(mpg~wt+qsec+am, data=mtcars)
 ```  
 
 The most optimal model coming out of Stepwise Addition/Elimination is:  
 
-MODEL 1: **mpg = `r signif(summary(model1)$coef[1,1], 3)` - `r signif(summary(model1)$coef[2,1], 3)` . wt + `r signif(summary(model1)$coef[3,1], 3)` . qsec + `r signif(summary(model1)$coef[4,1], 3)` . am**   
+MODEL 1: **mpg = `r signif(summary(model1)$coef[1,1], 3)` `r signif(summary(model1)$coef[2,1], 3)` * wt + `r signif(summary(model1)$coef[3,1], 3)` * qsec + `r signif(summary(model1)$coef[4,1], 3)` * amManual**   
 
-Thus, two more predictors have been added to the base model. Note: There's a concern here that the mean MPG for automatic transmissions (the intercept), holding other predictors constant, is _not_ significant.
+Thus, two more predictors have been added to the base model. _Note:_ There's a concern here that the mean MPG for automatic transmissions (the intercept), holding other predictors constant, is _not_ significant. However, the _adjusted R^2^ is a strong *0.83*.
 
-## MODEL 2 (Linear Correlation): Most Correlated Response-Predictor Pairs
+## MODEL 2 (Linear Correlation)
 
-The concern above has led us to look for yet other means of explaining confounding predictors. We turn to linear relationship with the response to help us pick likely candidates. We thus take a look at scatter plots of the response - MPG - against every potential predictor in Figure 1.1 (appendix). We filter predictors based on the following criteria:  
+The concern above has led us to look for yet other means of explaining confounding predictors. We turn to linear relationship with the response to help us pick likely candidates. We thus take a look at scatter plots of MPG against every potential predictor in Figure 1 (appendix). We select predictors based on the following criteria:  
 
 - High _Adjusted R^2^_ (showing a high linear relationship with response)
 - Slope coefficient that's significant. 
 - Approximate linear relationship with fitted line, few outliers acceptable.  
 
-The candidate predictors from Figure 1.1 to be added to the base model are thus (in decreasing strength of R^2^): **wt, cyl, disp, hp, and drat**. We now use the stepwise addition/elimination process on the potential equation, mpg ~ am + wt + cyl + disp + hp + drat. We get:  
+The candidate predictors from Figure 1 to be added to the base model are thus (in decreasing strength of R^2^): **wt, cyl, disp, hp, and drat**. We now use the _stepwise_ addition/elimination process on the potential equation, mpg ~ am + wt + cyl + disp + hp + drat. We get:  
 
 ```{r}
 model2.step <- step(lm(mpg~am+wt+cyl+disp+hp+drat, data=mtcars), direction="both", trace=FALSE)
-knitr::kable(model2.step$coef)
+knitr::kable(coef(model2.step), col.names = 'estimate', caption='Coefficients for Model 2')
 ```
 
-We are compelled to force "am" into the model, and thus extract the result from the second-last step the procedure above. Finally, as a guard against _Multicollinearity_. We achieve this by performing a Variance Inflation Test between the predictors and eliminating those that show an abnormal bump in standard deviation:  
+We force "am" into the model, and thus extract the result from the second-last step the procedure above. Finally, we guard against _multicollinearity_ by performing a Variance Inflation Test between the predictors and eliminating those that show an abnormal bump in standard deviation:  
 
 ```{r}
-cat("SD Inflation for Model 2: \n")
-knitr::kable(sqrt(vif(lm(mpg~am+wt+cyl+hp, data=mtcars))))
+knitr::kable(sqrt(vif(lm(mpg~am+wt+cyl+hp, data=mtcars))), col.names='SD Inf', caption = 'SD Inflation for Model 2')
 ```  
 
-After removing the interrelated predictor we arrive at a fairly orthogonal predictor set:
+After removing the interrelated predictor "cyl" we arrive at a fairly orthogonal predictor set:
 ```{r}
 model2 <- lm(mpg~wt+hp+am, data=mtcars)
 ```  
 
-MODEL 2, **mpg = `r signif(summary(model2)$coef[1,1], 3)` - `r signif(summary(model1)$coef[2,1], 3)` . wt - `r signif(summary(model1)$coef[3,1], 3)` . hp + `r signif(summary(model1)$coef[4,1], 3)` . am**   
+MODEL 2, **mpg = `r signif(summary(model2)$coef[1,1], 3)` `r signif(summary(model1)$coef[2,1], 3)` * wt - `r signif(summary(model1)$coef[3,1], 3)` * hp + `r signif(summary(model1)$coef[4,1], 3)` * amManual** ; _adjusted R^2^_ is *0.82*.
 
-Note: There's a concern here that the mean MPG difference for manual transmissions, holding other predictors constant, is _not_ significant.
+_Note:_ There's a concern here that the mean MPG difference for manual transmissions, holding other predictors constant, is _not_ significant.
 
-# Refining Models
+# Verifying Models
 
-## Verify Significant Deviations (ANOVA)
+## ANOVA Test
 
 We want to be certain that the predictors added to each model cause a significant difference in the sum of squares and overall variation:
 
@@ -99,98 +98,71 @@ temp1 <- update(temp, mpg~am+wt)
 temp2 <- update(temp, mpg~am+wt+qsec)
 temp3 <- update(temp, mpg~am+wt+hp)
 
-cat("Model 1 ANOVA: \n")
-knitr::kable(anova(temp, temp1, temp2))
+knitr::kable(anova(temp, temp1, temp2), caption='Model 1 ANOVA Test')
 
-cat("Model 2 ANOVA: \n")
-knitr::kable(anova(temp, temp1, temp3))
+knitr::kable(anova(temp, temp1, temp3), caption='Model 2 ANOVA Test')
 
 rm(list=c('temp','temp1','temp2','temp3'))
-```
+```  
+
 We see that in each model, adding the predictors causes significant change in the sum of squares measure. Both models 1 and 2 have fairly orthogonal and influential predictors.
 
 ## Residual Diagnostics
 
-Finally, we take a loot at some Residual plots to verify that the following assumptions **hold true** for each model:
+Finally, we take a loot at some Residual plots (Figure 2.1) to verify that the following assumptions **hold true** for each model:
 
-1. Homoskedasticity of residuals around fitted line
-2. Error terms are approximately normally distributed
-3. Non-systematic residuals (no apparent patterns)
-4. Id any abnormal leverage points exerting influence
+1. Homoskedasticity of residuals around fitted line: This holds approximately for all models.
+2. Error terms are approximately normally distributed: This holds approximately for all models, with some outliers for Models 1 and 2.
+3. Non-systematic residuals (no apparent patterns): This is mostly pattern free.
 
-Figure 2.1 generates a grid where a series of residual plots in each column represents each competing model. We note the following observations about the models:
+The residual analysis shows us that Models 1 and 2 are roughly homoskedastic, while their residuals approximate a normal distribution. Model 2, however, does have some extreme outliers far away from the quantile line. These need to be investigated. Model 1 also has some outliers that need a closer look.
 
-Model 0: Base                      | Model 1: Step (All Predictors) | Model 2: Step (Correlated Predictors)
-mpg ~ am                           | mpg ~ wt + qsec + am           | mpg ~ wt + hp + am
------------------------------------|-----------------------------   |-----------------------------
-Some Variance Between Groups       | Roughly Homoskedastic          | Roughly Homoskedastic
-Normally Distributed               | Normal, High Outliers          | Normal, High Outliers
-Faint Linear Indication            | Roughly Pattern Free           | Roughly Pattern Free
-N/A                                | 3 Potential Leverage Points    | 3 Potential Leverage Points
-
-THe residual analysis shows us that Models 1 and 2 are roughly homoskedastic, while their residuals approximate a normal distribution. Model 2, however, does have some extreme outliers far away from the quantile line. These need to be investigated. Model 1 also has some outliers that need a closer look.
-
-### Evaluating Influence
+## Evaluating Influence
 
 ```{r eval=F}
 M1 <- sort(hatvalues(model1), decreasing = T)
 M2 <- sort(hatvalues(model2), decreasing = T)
 M3 <- sort(hatvalues(model3), decreasing = T)
-
-# cat("Model 1 Potential Influencers \n")
-# knitr::kable(mtcars[rownames(mtcars) %in% c("Maserati Bora", "Chrysler Imperial"),])
-# 
-# cat("Model 2 Potential Influencers \n")
-# knitr::kable(mtcars[rownames(mtcars) %in% c("Merc 230", "Chrysler Imperial", "Fiat 128"),])
-# 
-# cat("Model 3 Potential Influencers \n")
-# knitr::kable(mtcars[rownames(mtcars) %in% c("Merc 230", "Chrysler Imperial", "Pantera"),])
 ```
 
-Figure 2.2 shows us the concerning leverage points in each model. We're concerned about leverage points that are farther away (larger hat values) that _also_ exert more influence as shown by the deviation from the standardized residuals in the influence plots in figure 2.2. This might cause the regression line to bend unfairly towards such values. In order to quantify this combination of influence and leverage, we list the highest _Cook's Distance_ measures for each such leverage point:  
+Figure 2.2 shows us the concerning leverage points in each model. We're concerned about leverage points that are farther away (larger hat values) which _also_ exert more influence as shown by the deviation from the standardized residuals in the influence plots. This might cause the regression line to bend unfairly towards such values. In order to quantify this combination of influence and leverage, we list the highest _Cook's Distance_ measures for each such leverage point:  
 
 ```{r}
-cat("Model 0, Major Leverage + Influence Points \n")
-knitr::kable(which(cooks.distance(model0) > (4/(nrow(mtcars)-3-1)) ) )
+knitr::kable(which(cooks.distance(model0) > (4/(nrow(mtcars)-3-1)) ), col.names = "Model 0: Cook's Dist.")
 
-cat("Model 1, Major Leverage + Influence Points \n")
-knitr::kable(which(cooks.distance(model1) > (4/(nrow(mtcars)-3-1)) ) )
+knitr::kable(which(cooks.distance(model1) > (4/(nrow(mtcars)-3-1)) ), col.names = "Model 1: Cook's Dist." )
 
-cat("Model 2, Major Leverage + Influence Points \n")
-knitr::kable(which(cooks.distance(model2) > (4/(nrow(mtcars)-3-1)) ) )
+knitr::kable(which(cooks.distance(model2) > (4/(nrow(mtcars)-3-1)) ), col.names = "Model 2: Cook's Dist." )
 
 # look at each corresponding observation and make a manual determination on whether or not to remove the outliers.
-```
+```  
 
-The concerning leverage points are those which also exert a large influence on the corresponding model. From the influence plots we see that the _Merc 230_ and _Chrysler Imperial_ are high leverage points that have a greater standard residual error, thus exerting a greater influence on the model. Similarly, the Chrysler Imperial and Maserati Bora are candidates for Model 2. In reviewing these records, however, there is no indication of an erroneous data point. These are merely extreme specimens of a combination of predictor values. We choose to err on the side of caution and be cautious with our regression assumptions by choosing _not_ to remove these data points from our models.  
+In reviewing these outlier records, however, there is *no* indication of erroneous data points. These are merely extreme specimens of a combination of predictor values. We choose to err on the side of caution with our regression assumptions by choosing *not* to remove these data points from our models.  
 
 
 # Best Fit Model and Results
 
-Given the Refining excercise above, we see that Model 1 has a slight advantage over Model 2 and both models are far better than Model 0 in terms of the _adjusted R^2^_. Moreover, the overall outlier exertion on the model (judged in terms of the cook's distance) seems to be slightly better for Model 1. We therefore choose model 1 to represent our best fit model in this multivariate analysis:  
+Given the refining excercises above, we see that Model 1 has a slight advantage over Model 2 and both models are far better than Model 0 in terms of the _adjusted R^2^_. Moreover, the overall outlier exertion on the model (judged in terms of their mean Cook's Distance) seems to be slightly better for Model 1. We therefore choose model 1 to represent our best fit model in this multivariate analysis:  
 
-
-BEST FIT MODEL: **mpg = `r signif(summary(model1)$coef[1,1], 3)` - `r signif(summary(model1)$coef[2,1], 3)` . wt + `r signif(summary(model1)$coef[3,1], 3)` . qsec + `r signif(summary(model1)$coef[4,1], 3)` . am**   
+BEST FIT MODEL: **mpg = `r signif(summary(model1)$coef[1,1], 3)` `r signif(summary(model1)$coef[2,1], 3)` * wt + `r signif(summary(model1)$coef[3,1], 3)` * qsec + `r signif(summary(model1)$coef[4,1], 3)` * amManual**   
 
 ## Results
 
-We summarize our the relationships expressed by our model as follows: The average MPG for vehicles with manual transmissions - while holding "wt", "qsec", and the automatic transmission coefficients constant - sees an advantage of **2.94 Miles Per Gallon** over the automatic transmissions in this dataset. Furthermore, we state with _95% confidence_ that manual transmissions enjoy a positive advantage in the range of **0.05 to 5.83 MPG** over their automatic counterparts, while holding weight and qsec values constant at the coefficients shown by the equation above. We see this confidence interval generated below: 
+We thus summarize the relationships expressed by our model as follows: The average MPG for vehicles with manual transmissions - while holding "wt", "qsec", and the automatic transmission coefficients constant - sees an advantage of **2.94 Miles Per Gallon** over the automatic transmissions in this dataset. Furthermore, we state with _95% confidence_ that, manual transmissions enjoy a positive advantage in the range of **0.05 to 5.83 MPG** over their automatic counterparts, while holding weight and qsec values constant at the coefficients shown by the equation above. We can see these confidence interval generated below: 
 
 ```{r}
-knitr::kable(confint(model1))
+knitr::kable(confint(model1), caption = 'Confidence Intervals for Coefficients of Model 1')
 ```
 
-Finally, the Figure 3 sums up the relationship between the automatic and manual transmission groups in the 3d scatter. We see that the best fit plane of both groups vary significantly as suggested by our model.
+Finally, _figure 3_ summarizes the relationship between the automatic and manual transmission groups in the 3d scatter. We see that the best fit plane of both groups vary significantly as suggested by our model.
 
-# APPENDICES
+# APPENDIX
 
-## MODEL 1: LINEAR CORRELATIONS
+## Figure 1: Linear Correlations for MPG ~ .
 
-### Figure 1.1: Pairs Plot with Adjusted R^2 and Coefficient Significance
+This scatterplot produces a pairs plot with the lower panel showing the _adjusted R^2^_ value between response and predictor, as well as the coefficient's p-value. The font size increases by strength of the correlation. 
 
-This scatterplot produces a pairs plot with the lower panel showing the adjusted R^2 value between response and predictor, as well as coefficient's p-value.
-
-```{r}
+```{r fig.width=8, fig.height=6}
 # First, I write a function (edited from ?pairs) to display the correlation between response-predictor pairs and it's significance. This function adjusts the font size of the text with the strength of correlation:
 panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
 {
@@ -218,37 +190,35 @@ panel.line <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
 }
 
 #all predictors
-pairs(mpg~., data=mtcars, upper.panel=panel.line, cex=.8,cex.labels=2,font.labels=2, lower.panel=panel.cor)
+pairs(mpg~., data=mtcars, upper.panel=panel.line, cex=1,cex.labels=2,font.labels=2, lower.panel=panel.cor)
 ``` 
 
 ```{r figure1_1, eval=F}
 GGally::ggpairs(data=mtcars, color=mtcars$am,alpha=.2, lower=list(continuous='smooth'), params=c(method='loess'), title="MTCARS LINEAR CORRELATION PAIR CHART: mpg~.")
 ```
 
-### Figure 2.1: Residual Diagnostic Plots
+## Figure 2.1: Residual Diagnostic Plots
 
-Plotting Summary Residual Plots for all 3 Models (4 plots each):
-
-```{r}
-library(gplots)
+```{r fig.height=6}
+#library(gplots)
 
 par(mfcol=c(5,3), mar=(c(3, 0, 0, 1)))
 textplot("Model 0 (Base)", cex=1)
-palette(c('cyan','darkgreen','green'))
+palette(c('cyan','green', 'black'))
 plot(model0, pch=21, col='black', bg=mtcars$am)
 
 textplot("Model 1 (All Predictors, Step)", cex=1)
-palette(c('cyan','darkgreen','green'))
+palette(c('cyan','green', 'black'))
 plot(model1, pch=21, col='black', bg=mtcars$am)
 
 textplot("Model 2 (Correlation, Step)", cex=1)
-palette(c('cyan','darkgreen','green'))
+palette(c('cyan','green', 'black'))
 plot(model2, pch=21, col='black', bg=mtcars$am)
 ```
 
-### Figure 2.2: Influence and Leverage
+## Figure 2.2: Influence and Leverage
 
-Closer look at Leverage points (hatvalues) for each model
+Closer look at Leverage points (hatvalues) and their deviation from standard residuals, for each model
 ```{r eval=F}
 boxplot(M1, M2, M3)
 text(x=1, y=boxplot(M1, plot=F)$out, labels=names(boxplot(M1, plot=F)[4][[1]]))
@@ -256,9 +226,9 @@ text(x=2, y=boxplot(M2, plot=F)$out, labels=names(boxplot(M2, plot=F)[4][[1]]))
 text(x=3, y=boxplot(M3, plot=F)$out, labels=names(boxplot(M3, plot=F)[4][[1]]))
 ```
 
-```{r}
-par(mfrow=c(3,1), mar=c(5, 5, 2, 3))
-influencePlot(model0, id.col='blue')
+```{r fig.height=8}
+par(mfrow=c(2,1), mar=c(5, 5, 2, 3))
+#influencePlot(model0, id.col='blue')
 influencePlot(model1, id.col='darkgreen')
 influencePlot(model2, id.col='brown')
 ```
